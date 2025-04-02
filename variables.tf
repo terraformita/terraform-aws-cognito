@@ -1,25 +1,25 @@
 variable "region" {
-  description = "AWS region to deploy to"
+  description = "AWS region where resources will be created."
   type        = string
 }
 
 variable "stage_name" {
-  description = "Stage name"
+  description = "Name of the deployment stage used for resource naming."
   type        = string
 }
 
 variable "domain_name" {
-  description = "Domain name of the application"
+  description = "Base domain name for the application and Cognito domains."
   type        = string
 }
 
 variable "tags" {
-  description = "Tags to apply to all AWS resources created"
+  description = "Key-value pairs to tag all created AWS resources."
   type        = map(string)
 }
 
 variable "auth" {
-  description = "Centralized user authentication configuration"
+  description = "Configuration for centralized user authentication settings."
   type = object({
     allow_user_sign_up     = optional(bool, true)
     identity_providers     = optional(list(string), [])
@@ -32,7 +32,7 @@ variable "auth" {
 }
 
 variable "host_based_auth" {
-  description = "Host-based user authentication configuration"
+  description = "Configuration for host-based authentication with separate user pools."
   type = map(object({
     user_pool_id = optional(string, "centralized")
     automated    = optional(bool, true)
@@ -58,7 +58,7 @@ variable "host_based_auth" {
 }
 
 variable "app_containers_map" {
-  description = "List of containers to run in the ECS task"
+  description = "Configuration for ECS containers including authentication settings."
   type = map(object({
     hostname       = optional(string)
     web_path       = optional(string, "/")
@@ -110,7 +110,7 @@ variable "app_containers_map" {
 }
 
 variable "identity_providers" {
-  description = "List of identity providers to configure for user authentication"
+  description = "Configuration for external identity providers like Google or SAML."
   type = map(object({
     type              = string
     metadata_url      = string
@@ -120,7 +120,7 @@ variable "identity_providers" {
 }
 
 variable "mail_sending" {
-  description = "Value for the 'From' field in emails sent by the application"
+  description = "Configuration for email sending via AWS SES."
   type = object({
     enabled      = bool
     from_address = optional(string)

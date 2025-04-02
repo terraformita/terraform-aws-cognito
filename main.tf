@@ -47,8 +47,7 @@ locals {
   ])
 }
 
-resource "random_uuid" "external_id" {
-}
+resource "random_uuid" "external_id" {}
 
 resource "random_id" "id" {
   byte_length = 8

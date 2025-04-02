@@ -85,25 +85,23 @@ module "cognito_auth" {
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| region | AWS region to deploy to | `string` | n/a | yes |
-| stage_name | Stage name | `string` | n/a | yes |
-| domain_name | Domain name of the application | `string` | n/a | yes |
-| auth | Centralized user authentication configuration | `object` | `{}` | no |
-| host_based_auth | Host-based user authentication configuration | `map(object)` | `{}` | no |
-| identity_providers | List of identity providers to configure | `map(object)` | `{}` | no |
-| mail_sending | Email sending configuration | `object` | `{ enabled = false }` | no |
-| tags | Tags to apply to all AWS resources | `map(string)` | n/a | yes |
+| region | AWS region where resources will be created. | `string` | n/a | yes |
+| stage_name | Name of the deployment stage used for resource naming. | `string` | n/a | yes |
+| domain_name | Base domain name for the application and Cognito domains. | `string` | n/a | yes |
+| auth | Configuration for centralized user authentication settings. | `object` | `{}` | no |
+| host_based_auth | Configuration for host-based authentication with separate user pools. | `map(object)` | `{}` | no |
+| identity_providers | Configuration for external identity providers like Google or SAML. | `map(object)` | `{}` | no |
+| mail_sending | Configuration for email sending via AWS SES. | `object` | `{ enabled = false }` | no |
+| tags | Key-value pairs to tag all created AWS resources. | `map(string)` | n/a | yes |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
-| user_pool_id | ID of the centralized user pool |
-| user_pool_arn | ARN of the centralized user pool |
-| user_pool_endpoint | Endpoint of the centralized user pool |
-| host_based_user_pools | Map of host-based user pool IDs |
-| host_based_user_pool_arns | Map of host-based user pool ARNs |
-| host_based_user_pool_endpoints | Map of host-based user pool endpoints |
+| client_id | Map of OAuth client IDs for each host-based authentication configuration. |
+| client_secret | Map of OAuth client secrets for each host-based authentication configuration. |
+| domain | Map of authentication domains for each host-based configuration. |
+| user_pool_id | Map of user pool IDs for each host-based authentication configuration. |
 
 ## License
 
