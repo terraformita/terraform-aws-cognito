@@ -98,10 +98,7 @@ module "cognito_auth" {
 
 | Name | Description |
 |------|-------------|
-| client_id | Map of OAuth client IDs for each host-based authentication configuration. |
-| client_secret | Map of OAuth client secrets for each host-based authentication configuration. |
-| domain | Map of authentication domains for each host-based configuration. |
-| user_pool_id | Map of user pool IDs for each host-based authentication configuration. |
+| auth | Authentication configuration for each container including client IDs, secrets, domains and user pool IDs. |
 
 ## License
 
