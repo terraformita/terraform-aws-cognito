@@ -107,6 +107,37 @@ variable "app_containers_map" {
 
     }))
   }))
+  default = {}
+}
+
+variable "usage_mode" {
+  description = "Operational mode: 'ecs' (requires app_containers_map) or 'standalone' (requires standalone_clients)."
+  type        = string
+  default     = "ecs"
+  validation {
+    condition     = contains(["ecs", "standalone"], var.usage_mode)
+    error_message = "Valid values for usage_mode: 'ecs', 'standalone'."
+  }
+}
+
+variable "user_pool_name" {
+  description = "Override the default User Pool name."
+  type        = string
+  default     = null
+}
+
+variable "standalone_clients" {
+  description = "Configuration for standalone OAuth clients. Required when usage_mode='standalone'."
+  type = map(object({
+    callback_urls          = list(string)
+    logout_urls            = list(string)
+    allowed_oauth_flows    = optional(list(string), ["code"])
+    allowed_oauth_scopes   = optional(list(string), ["phone", "email", "openid", "profile"])
+    refresh_token_validity = optional(number, 43200)
+    access_token_validity  = optional(number, 60)
+    id_token_validity      = optional(number, 60)
+  }))
+  default = {}
 }
 
 variable "identity_providers" {

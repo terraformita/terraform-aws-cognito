@@ -26,7 +26,8 @@ locals {
   }
 
   # Create centralized user pool if any of the hosts are not using their own
-  create_user_pool = length(local.host_based_user_pools) != length(local.host_names)
+  # OR if we have standalone clients defined and mode is standalone
+  create_user_pool = (var.usage_mode == "ecs" && length(local.host_based_user_pools) != length(local.host_names)) || (var.usage_mode == "standalone" && length(var.standalone_clients) > 0)
 
   cognito_domain = var.stage_name # "auth-${var.stage_name}.${var.domain_name}"
   # "https://${aws_cognito_user_pool.user_pool[0].id}.auth.${var.region}.amazoncognito.com/oauth2/idpresponse" : ""
@@ -45,6 +46,8 @@ locals {
     for name, container in var.app_containers_map :
     container.hostname if container.hostname != null
   ])
+
+  name_prefix = var.stage_name == "ignore" ? replace(var.domain_name, ".", "-") : var.stage_name
 }
 
 resource "random_uuid" "external_id" {}
@@ -54,7 +57,7 @@ resource "random_id" "id" {
 }
 
 resource "aws_iam_role_policy" "cognito_send_sms" {
-  name = "${var.stage_name}-cognito-send-sms"
+  name = join("-", compact([local.name_prefix, "cognito-send-sms"]))
   role = aws_iam_role.user_pool.id
   policy = jsonencode({
     Version = "2012-10-17"
@@ -69,7 +72,7 @@ resource "aws_iam_role_policy" "cognito_send_sms" {
 #### COGNITO USER POOL
 resource "aws_cognito_user_pool" "user_pool" {
   count             = local.create_user_pool ? 1 : 0
-  name              = "${var.stage_name}-user-pool"
+  name              = var.user_pool_name != null ? var.user_pool_name : join("-", compact([local.name_prefix, "user-pool"]))
   mfa_configuration = "OPTIONAL"
 
   auto_verified_attributes = [
@@ -120,8 +123,11 @@ resource "aws_cognito_user_pool" "user_pool" {
     ]
   }
 
-  lambda_config {
-    pre_sign_up = module.pre_signup_lambda.lambda_function.arn
+  dynamic "lambda_config" {
+    for_each = var.usage_mode == "ecs" ? [1] : []
+    content {
+      pre_sign_up = module.pre_signup_lambda[0].lambda_function.arn
+    }
   }
 
   sms_configuration {
@@ -145,11 +151,18 @@ resource "aws_cognito_user_pool" "user_pool" {
   #   email_verification_message = var.messages.email_verification_message
 
   tags = var.tags
+
+  lifecycle {
+    precondition {
+      condition     = var.usage_mode == "standalone" || (var.usage_mode == "ecs" && length(var.app_containers_map) > 0)
+      error_message = "When usage_mode is 'ecs', 'app_containers_map' must not be empty."
+    }
+  }
 }
 
 resource "aws_cognito_user_pool" "host_based" {
   for_each          = toset(local.host_based_user_pools)
-  name              = "${var.stage_name}-${each.value}"
+  name              = join("-", compact([local.name_prefix, each.value]))
   mfa_configuration = "OPTIONAL"
 
   auto_verified_attributes = [
@@ -199,8 +212,11 @@ resource "aws_cognito_user_pool" "host_based" {
     ]
   }
 
-  lambda_config {
-    pre_sign_up = module.pre_signup_lambda.lambda_function.arn
+  dynamic "lambda_config" {
+    for_each = var.usage_mode == "ecs" ? [1] : []
+    content {
+      pre_sign_up = module.pre_signup_lambda[0].lambda_function.arn
+    }
   }
 
   sms_configuration {
@@ -229,13 +245,13 @@ resource "aws_cognito_user_pool" "host_based" {
 # TODO: return this back when possible
 resource "aws_cognito_user_pool_domain" "user_pool" {
   count        = local.create_user_pool ? 1 : 0
-  domain       = var.stage_name
+  domain       = local.name_prefix
   user_pool_id = aws_cognito_user_pool.user_pool[0].id
 }
 
 resource "aws_cognito_user_pool_domain" "host_based" {
   for_each     = toset(local.host_based_user_pools)
-  domain       = "${var.stage_name}-${each.value}"
+  domain       = join("-", compact([local.name_prefix, each.value]))
   user_pool_id = aws_cognito_user_pool.host_based[each.key].id
 }
 
@@ -286,7 +302,7 @@ resource "aws_cognito_identity_provider" "host_based_idp" {
 # COGNITO USER POOL CLIENTS
 resource "aws_cognito_user_pool_client" "user_pool" {
   count = local.create_user_pool ? 1 : 0
-  name  = "${var.stage_name}-user-pool-client"
+  name  = join("-", compact([local.name_prefix, "user-pool-client"]))
 
   user_pool_id    = aws_cognito_user_pool.user_pool[0].id
   generate_secret = true
@@ -342,7 +358,7 @@ resource "aws_cognito_user_pool_client" "endpoint_centralized" {
     for container, config in local.auth_enabled_endpoints :
     container => config if !contains(local.host_based_user_pools, config.hostname)
   } : {}
-  name = "${var.stage_name}-${each.key}"
+  name = join("-", compact([local.name_prefix, each.key]))
 
   user_pool_id    = aws_cognito_user_pool.user_pool[0].id
   generate_secret = true
@@ -397,7 +413,7 @@ resource "aws_cognito_user_pool_client" "host_based" {
     for hostname, config in local.auth_enabled_hosts :
     hostname => config if contains(local.host_based_user_pools, hostname)
   }
-  name = "${var.stage_name}-${each.key}"
+  name = join("-", compact([local.name_prefix, each.key]))
 
   user_pool_id    = aws_cognito_user_pool.host_based[each.key].id
   generate_secret = true
@@ -447,9 +463,53 @@ resource "aws_cognito_user_pool_client" "host_based" {
   ]
 }
 
-#### COGNITO USER POOL ROLE
+resource "aws_cognito_user_pool_client" "standalone" {
+  for_each = var.usage_mode == "standalone" ? var.standalone_clients : {}
+  name     = join("-", compact([local.name_prefix, each.key]))
+
+  user_pool_id    = aws_cognito_user_pool.user_pool[0].id
+  generate_secret = true
+
+  explicit_auth_flows = [
+    "ALLOW_CUSTOM_AUTH",
+    "ALLOW_REFRESH_TOKEN_AUTH",
+    "ALLOW_USER_PASSWORD_AUTH",
+    "ALLOW_USER_SRP_AUTH"
+  ]
+
+  token_validity_units {
+    access_token  = "minutes"
+    id_token      = "minutes"
+    refresh_token = "minutes"
+  }
+
+  refresh_token_validity = each.value.refresh_token_validity
+  access_token_validity  = each.value.access_token_validity
+  id_token_validity      = each.value.id_token_validity
+
+  allowed_oauth_scopes = each.value.allowed_oauth_scopes
+
+  allowed_oauth_flows_user_pool_client = true
+
+  allowed_oauth_flows  = each.value.allowed_oauth_flows
+  logout_urls          = each.value.logout_urls
+  callback_urls        = each.value.callback_urls
+  default_redirect_uri = each.value.callback_urls[0]
+
+  enable_token_revocation       = true
+  prevent_user_existence_errors = "ENABLED"
+  supported_identity_providers = concat(
+    keys(local.auth_identity_providers),
+    ["COGNITO"]
+  )
+
+  depends_on = [
+    aws_cognito_identity_provider.user_pool_idp
+  ]
+}
+
 resource "aws_iam_role" "user_pool" {
-  name = "${var.stage_name}-cognito-user-pool"
+  name = join("-", compact([local.name_prefix, "cognito-user-pool"]))
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -478,6 +538,8 @@ resource "aws_ses_email_identity" "sender_email" {
 
 ## AUTH LAMBDA
 data "archive_file" "auth_lambda" {
+  count = var.usage_mode == "ecs" ? 1 : 0
+
   type = "zip"
 
   source_dir  = "${path.module}/lambda/userinfo/code"
@@ -485,11 +547,12 @@ data "archive_file" "auth_lambda" {
 }
 
 module "auth_lambda" {
-  for_each = local.auth_enabled_hosts
-  source   = "terraformita/lambda/aws"
-  version  = "0.2.2"
+  for_each = var.usage_mode == "ecs" ? local.auth_enabled_hosts : {}
 
-  stage = "${var.stage_name}-${each.key}"
+  source  = "terraformita/lambda/aws"
+  version = "0.2.2"
+
+  stage = join("-", compact([local.name_prefix, each.key]))
   tags  = var.tags
 
   function = {
@@ -528,6 +591,8 @@ module "auth_lambda" {
 
 #### PRE-SIGNUP LAMBDA
 data "archive_file" "pre_signup_lambda" {
+  count = var.usage_mode == "ecs" ? 1 : 0
+
   type = "zip"
 
   source_file = "${path.module}/lambda/pre-signup/index.js"
@@ -535,6 +600,8 @@ data "archive_file" "pre_signup_lambda" {
 }
 
 module "pre_signup_lambda" {
+  count = var.usage_mode == "ecs" ? 1 : 0
+
   source  = "terraformita/lambda/aws"
   version = "0.2.2"
 
@@ -557,17 +624,19 @@ module "pre_signup_lambda" {
 }
 
 resource "aws_lambda_permission" "user_pool" {
-  count         = local.create_user_pool ? 1 : 0
+  count = (local.create_user_pool && var.usage_mode == "ecs") ? 1 : 0
+
   action        = "lambda:InvokeFunction"
-  function_name = module.pre_signup_lambda.lambda_function.function_name
+  function_name = module.pre_signup_lambda[0].lambda_function.function_name
   principal     = "cognito-idp.amazonaws.com"
   source_arn    = aws_cognito_user_pool.user_pool[0].arn
 }
 
 resource "aws_lambda_permission" "host_based" {
-  for_each      = toset(local.host_based_user_pools)
+  for_each = var.usage_mode == "ecs" ? toset(local.host_based_user_pools) : toset([])
+
   action        = "lambda:InvokeFunction"
-  function_name = module.pre_signup_lambda.lambda_function.function_name
+  function_name = module.pre_signup_lambda[0].lambda_function.function_name
   principal     = "cognito-idp.amazonaws.com"
   source_arn    = aws_cognito_user_pool.host_based[each.key].arn
 }

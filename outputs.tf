@@ -31,3 +31,15 @@ output "auth" {
     }
   }
 }
+
+output "standalone" {
+  description = "Authentication configuration for standalone clients."
+  value = {
+    for name, client in aws_cognito_user_pool_client.standalone : name => {
+      client_id     = client.id
+      client_secret = sensitive(client.client_secret)
+      user_pool_id  = aws_cognito_user_pool.user_pool[0].id
+      domain        = aws_cognito_user_pool_domain.user_pool[0].domain
+    }
+  }
+}
