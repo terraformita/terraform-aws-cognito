@@ -27,6 +27,12 @@ variable "auth" {
     refresh_token_validity = optional(number, 1440)
     access_token_validity  = optional(number, 60)
     id_token_validity      = optional(number, 60)
+    # advanced_security_mode: "AUDIT" or "ENFORCED"
+    advanced_security_mode = optional(string, null)
+    # mfa_configuration: "OFF", "ON", or "OPTIONAL"
+    mfa_configuration = optional(string, "OPTIONAL")
+    # user_pool_tier: "ESSENTIALS" (default), "LITE", "PLUS"
+    user_pool_tier = optional(string, "ESSENTIALS")
   })
   default = {}
 }
@@ -53,6 +59,12 @@ variable "host_based_auth" {
     id_token_validity      = optional(number, 60)
 
     separate_user_pool = optional(bool, false)
+    # advanced_security_mode: "AUDIT" or "ENFORCED"
+    advanced_security_mode = optional(string, null)
+    # mfa_configuration: "OFF", "ON", or "OPTIONAL"
+    mfa_configuration = optional(string, "OPTIONAL")
+    # user_pool_tier: "ESSENTIALS" (default), "LITE", "PLUS"
+    user_pool_tier = optional(string, "ESSENTIALS")
   }))
   default = {}
 }
