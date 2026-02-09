@@ -591,7 +591,7 @@ module "auth_lambda" {
 
     zip     = "${path.module}/lambda/userinfo/lambda_handler.py.zip"
     handler = "lambda_handler.lambda_handler"
-    runtime = "python3.8"
+    runtime = "python3.12"
     memsize = "256"
 
     track_versions = true
@@ -611,7 +611,7 @@ module "auth_lambda" {
 
   layer = {
     zip                 = "${path.module}/lambda/userinfo/sdk-layer.zip"
-    compatible_runtimes = ["python3.8"]
+    compatible_runtimes = ["python3.12"]
   }
 
   depends_on = [
@@ -644,7 +644,7 @@ module "pre_signup_lambda" {
 
     zip     = "${path.module}/lambda/pre-signup/pre_signup.js.zip"
     handler = "index.handler"
-    runtime = "nodejs16.x"
+    runtime = "nodejs22.x"
     memsize = "128"
 
     depends_on = [

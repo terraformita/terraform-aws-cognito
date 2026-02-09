@@ -23,14 +23,14 @@ docker run -v "$LAMBDA_DIR:/lambda" -w /lambda --rm -i $PLATFORM_FLAG $DOCKER_IM
   set -e
 
   # Install necessary packages
-  yum install -y gcc python3-devel
+  yum install -y gcc python3.12 python3.12-devel
 
   # Create and activate virtual environment
-  python3 -m venv venv
+  python3.12 -m venv venv
   source venv/bin/activate
 
   # Install dependencies
-  pip3 install pipreqs
+  pip3.12 install pipreqs
   pipreqs .
   pip3 install -r requirements.txt --target ${DST_FOLDER}
   pip3 install requests-aws4auth --upgrade --target ${DST_FOLDER}
